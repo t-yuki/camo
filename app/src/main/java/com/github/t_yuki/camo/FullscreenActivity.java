@@ -1,11 +1,20 @@
 package com.github.t_yuki.camo;
 
 import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
 import com.github.t_yuki.camo.util.SystemUiHider;
+import com.orbotix.DualStackDiscoveryAgent;
+import com.orbotix.Sphero;
+import com.orbotix.common.DiscoveryException;
+import com.orbotix.common.Robot;
+import com.orbotix.common.RobotChangedStateListener;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -23,12 +32,6 @@ import org.opencv.imgproc.Imgproc;
 import java.util.ArrayList;
 import java.util.List;
 
-import orbotix.robot.base.Robot;
-import orbotix.robot.base.RobotProvider;
-import orbotix.sphero.ConnectionListener;
-import orbotix.sphero.Sphero;
-import orbotix.view.connection.SpheroConnectionView;
-
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -36,7 +39,13 @@ import orbotix.view.connection.SpheroConnectionView;
  *
  * @see SystemUiHider
  */
-public class FullscreenActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
+public class FullscreenActivity extends Activity
+        implements CameraBridgeViewBase.CvCameraViewListener2,
+        RobotChangedStateListener,
+        SensorEventListener {
+    private SensorManager mSensorManager;
+    private Sensor mAccel;
+    private Sensor mMagnetic;
     private CameraBridgeViewBase mCameraView;
     // ライブラリ初期化完了後に呼ばれるコールバック (onManagerConnected)
     // public abstract class BaseLoaderCallback implements LoaderCallbackInterface
@@ -55,45 +64,53 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
         }
     };
 
-
     private Sphero mRobot;
-
-    /**
-     * The Sphero Connection View
-     */
-    private SpheroConnectionView mSpheroConnectionView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_fullscreen);
 
+        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        mAccel = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        mMagnetic = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+
         // カメラビューのインスタンスを変数にバインド
         mCameraView = (CameraBridgeViewBase) findViewById(R.id.camera_view);
         // リスナーの設定 (後述)
         mCameraView.setCvCameraViewListener(this);
 
+        DualStackDiscoveryAgent.getInstance().addRobotStateListener(this);
+    }
 
-        mSpheroConnectionView = (SpheroConnectionView) findViewById(R.id.sphero_connection_view);
-        mSpheroConnectionView.addConnectionListener(new ConnectionListener() {
-
-            @Override
-            public void onConnected(Robot robot) {
-                //SpheroConnectionView is made invisible on connect by default
-                mRobot = (Sphero) robot;
-            }
-
-            @Override
-            public void onConnectionFailed(Robot sphero) {
-                // let the SpheroConnectionView handle or hide it and do something here...
-            }
-
-            @Override
-            public void onDisconnected(Robot sphero) {
+    @Override
+    public void handleRobotChangedState(Robot robot, RobotChangedStateListener.RobotChangedStateNotificationType robotChangedStateNotificationType) {
+        switch (robotChangedStateNotificationType) {
+            case Online:
+                mRobot = new Sphero(robot);
+                break;
+            case Disconnected:
                 mRobot = null;
-                mSpheroConnectionView.startDiscovery();
+                startDiscovery();
+                break;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        DualStackDiscoveryAgent.getInstance().addRobotStateListener(null);
+    }
+
+    private void startDiscovery() {
+        //If the DiscoveryAgent is not already looking for robots, start discovery.
+        if (!DualStackDiscoveryAgent.getInstance().isDiscovering()) {
+            try {
+                DualStackDiscoveryAgent.getInstance().startDiscovery(this);
+            } catch (DiscoveryException e) {
+                Log.e("Sphero", "DiscoveryException: " + e.getMessage());
             }
-        });
+        }
     }
 
     @Override
@@ -158,7 +175,7 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
             if (mRobot == null) {
                 return in;
             }
-            float speed = rad / 10.0f; // 0% to 100%
+            float speed = 10.0f / rad; // 0% to 100%
             if (speed > 1.0f) {
                 speed = 1.0f;
             }
@@ -171,12 +188,14 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
     @Override
     protected void onResume() {
         super.onResume();
+
+        mSensorManager.registerListener(this, mAccel, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, mMagnetic, SensorManager.SENSOR_DELAY_NORMAL);
+
         // 非同期でライブラリの読み込み/初期化を行う
         // static boolean initAsync(String Version, Context AppContext, LoaderCallbackInterface Callback)
         OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_9, this, mLoaderCallback);
-
-        // Refresh list of Spheros
-        mSpheroConnectionView.startDiscovery();
+        startDiscovery();
     }
 
     @Override
@@ -190,8 +209,18 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
     @Override
     protected void onPause() {
         super.onPause();
+        mSensorManager.unregisterListener(this);
         // Disconnect Robot properly
-        RobotProvider.getDefaultProvider().disconnectControlledRobots();
+        //If the DiscoveryAgent is in discovery mode, stop it.
+        if (DualStackDiscoveryAgent.getInstance().isDiscovering()) {
+            DualStackDiscoveryAgent.getInstance().stopDiscovery();
+        }
+
+        //If a robot is connected to the device, disconnect it
+        if (mRobot != null) {
+            mRobot.disconnect();
+            mRobot = null;
+        }
     }
 
     /**
@@ -240,5 +269,15 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
 
         // Roll robot
         mRobot.drive(heading, speed);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
     }
 }

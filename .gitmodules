@@ -1,0 +1,6 @@
+[submodule "Sphero-Android-SDK"]
+	path = Sphero-Android-SDK
+	url = https://github.com/orbotix/Sphero-Android-SDK
+[submodule "app/Sphero-Android-SDK"]
+	path = app/Sphero-Android-SDK
+	url = https://github.com/orbotix/Sphero-Android-SDK

@@ -3,11 +3,10 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 21
     buildToolsVersion "21.1.2"
-
     defaultConfig {
         applicationId "com.github.t_yuki.camo"
         minSdkVersion 19
-        targetSdkVersion 21
+        targetSdkVersion 19
         versionCode 1
         versionName "1.0"
     }
@@ -19,15 +18,21 @@ android {
     }
     sourceSets {
         main {
-            jniLibs.srcDir 'libs'
+            jniLibs.srcDir 'Sphero-Android-SDK/library/libs'
         }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+    }
+    productFlavors {
     }
 }
 
 dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
-    compile 'com.android.support:appcompat-v7:22.0.0'
-    compile 'com.android.support:support-v4:22.0.0'
+    compile fileTree(include: ['*.jar'], dir: 'Sphero-Android-SDK/library')
     compile project(':openCVLibrary2410')
-    compile files('libs/RobotLibrary.jar')
+    compile 'com.android.support:support-v4:22.0.0'
+    compile 'com.android.support:appcompat-v7:22.0.0'
+    compile files('Sphero-Android-SDK/library/RobotLibrary.jar')
 }
