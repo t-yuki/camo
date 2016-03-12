@@ -2,6 +2,7 @@ package com.github.t_yuki.camo;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 
 import com.github.t_yuki.camo.util.SystemUiHider;
@@ -10,7 +11,17 @@ import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.Point;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import orbotix.robot.base.Robot;
 import orbotix.robot.base.RobotProvider;
@@ -79,6 +90,7 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
 
             @Override
             public void onDisconnected(Robot sphero) {
+                mRobot = null;
                 mSpheroConnectionView.startDiscovery();
             }
         });
@@ -94,10 +106,66 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
         // カメラプレビュー終了時に呼ばれる
     }
 
+    // HSV Color range to detect: green
+    Scalar low = new Scalar(29, 86, 6);
+    Scalar up = new Scalar(64, 255, 255);
+
+    Mat w1;
+    Mat w2;
+
     // CvCameraViewListener2 の場合
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        return inputFrame.rgba();
+        Mat in = inputFrame.rgba();
+        if (w1 == null) {
+            w1 = new Mat((int) (in.rows() * 0.25), (int) (in.cols() * 0.25), CvType.CV_8UC1);
+            w2 = new Mat((int) (in.rows() * 0.25), (int) (in.cols() * 0.25), CvType.CV_8UC1);
+        }
+        Imgproc.resize(in, w1, w1.size(), 0, 0, Imgproc.INTER_CUBIC);
+
+        Imgproc.cvtColor(w1, w2, Imgproc.COLOR_RGB2HSV);
+        Core.inRange(w2, low, up, w1);
+        Imgproc.erode(w1, w2, Mat.ones(5, 5, CvType.CV_8UC1), new Point(-1, -1), 2);
+        Imgproc.dilate(w2, w1, Mat.ones(5, 5, CvType.CV_8UC1), new Point(-1, -1), 2);
+
+        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        Mat hier = new Mat();
+
+        Imgproc.findContours(w1, contours, hier, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        if (contours.size() == 0) {
+            return in;
+        }
+
+        for (MatOfPoint area : contours) {
+            double sz = Imgproc.contourArea(area);
+
+            MatOfPoint2f area2f = new MatOfPoint2f(area.toArray());
+            Point center = new Point();
+            float[] rads = new float[1];
+            Imgproc.minEnclosingCircle(area2f, center, rads);
+            int rad = (int) rads[0];
+
+            double csz = 2 * rads[0] * rads[0] * 3.14;
+            Log.w("CAMO", "area: " + sz + " circle sz:" + csz);
+            if (sz * 6 < csz) { // heuristic: not filled circle
+                continue;
+            }
+
+            Core.circle(in, new Point(center.x * 4, center.y * 4), rad * 4, new Scalar(0, 0, 255));
+            if (rad < 20) { // too small
+                continue;
+            }
+            if (mRobot == null) {
+                return in;
+            }
+            float speed = rad / 10.0f; // 0% to 100%
+            if (speed > 1.0f) {
+                speed = 1.0f;
+            }
+            mRobot.drive(0f, speed); // TODO: which heading is front??
+            return in;
+        }
+        return in;
     }
 
     @Override
@@ -135,6 +203,7 @@ public class FullscreenActivity extends Activity implements CameraBridgeViewBase
         if (mRobot != null) {
             // Stop robot
             mRobot.stop();
+            mRobot = null;
         }
     }
 
