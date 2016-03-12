@@ -1,0 +1,68 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:opencv="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:background="#0099cc"
+
+    tools:context=".FullscreenActivity">
+
+    <!-- The primary full-screen view. This can be replaced with whatever view
+         is needed to present your content, e.g. VideoView, SurfaceView,
+         TextureView, etc. -->
+
+    <!-- This FrameLayout insets its children based on system windows using
+         android:fitsSystemWindows. -->
+    <org.opencv.android.JavaCameraView
+        android:id="@+id/camera_view"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:visibility="visible"
+        opencv:camera_id="any"
+        opencv:show_fps="true" />
+
+    <Button
+        android:id="@+id/stop_button"
+        style="@style/ControlButton"
+        android:layout_centerInParent="true"
+        android:onClick="onStopClick"
+        android:text="STOP" />
+
+    <Button
+        android:id="@+id/zero_button"
+        style="@style/ControlButton"
+        android:layout_above="@id/stop_button"
+        android:layout_alignLeft="@id/stop_button"
+        android:onClick="onControlClick"
+        android:text="0˚" />
+
+    <Button
+        android:id="@+id/ninety_button"
+        style="@style/ControlButton"
+        android:layout_alignTop="@id/stop_button"
+        android:layout_toRightOf="@id/stop_button"
+        android:onClick="onControlClick"
+        android:text="90˚" />
+
+    <Button
+        android:id="@+id/one_eighty_button"
+        style="@style/ControlButton"
+        android:layout_alignLeft="@id/stop_button"
+        android:layout_below="@id/stop_button"
+        android:onClick="onControlClick"
+        android:text="180˚" />
+
+    <Button
+        android:id="@+id/two_seventy_button"
+        style="@style/ControlButton"
+        android:layout_alignTop="@id/stop_button"
+        android:layout_toLeftOf="@id/stop_button"
+        android:onClick="onControlClick"
+        android:text="270˚" />
+
+    <orbotix.view.connection.SpheroConnectionView
+        android:id="@+id/sphero_connection_view"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:background="#D0000000" />
+</RelativeLayout>
