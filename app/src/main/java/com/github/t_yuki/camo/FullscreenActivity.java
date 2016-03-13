@@ -123,9 +123,13 @@ public class FullscreenActivity extends Activity
         // カメラプレビュー終了時に呼ばれる
     }
 
+    // HSV Color range to detect: orange
+    Scalar low = new Scalar(7, 170, 115);
+    Scalar up = new Scalar(25, 255, 255);
     // HSV Color range to detect: green
-    Scalar low = new Scalar(29, 86, 6);
-    Scalar up = new Scalar(64, 255, 255);
+    //  Scalar low = new Scalar(29, 86, 60);
+    //  Scalar up = new Scalar(64, 255, 255);
+
 
     Mat w1;
     Mat w2;
